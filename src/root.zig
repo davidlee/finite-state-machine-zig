@@ -1,38 +1,8 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const List = std.ArrayList;
-const Map = std.AutoHashMap;
-const StrMap = std.StringHashMap;
-const BitSet = std.DynamicBitSet;
-
-// Useful stdlib functions
-const tokenizeAny = std.mem.tokenizeAny;
-const tokenizeSeq = std.mem.tokenizeSequence;
-const tokenizeSca = std.mem.tokenizeScalar;
-const splitAny = std.mem.splitAny;
-const splitSeq = std.mem.splitSequence;
-const splitSca = std.mem.splitScalar;
-const indexOf = std.mem.indexOfScalar;
-const indexOfAny = std.mem.indexOfAny;
-const indexOfStr = std.mem.indexOfPosLinear;
-const lastIndexOf = std.mem.lastIndexOfScalar;
-const lastIndexOfAny = std.mem.lastIndexOfAny;
-const lastIndexOfStr = std.mem.lastIndexOfLinear;
-const trim = std.mem.trim;
-const sliceMin = std.mem.min;
-const sliceMax = std.mem.max;
-
-const parseInt = std.fmt.parseInt;
-const parseFloat = std.fmt.parseFloat;
-
-const print = std.debug.print;
-const assert = std.debug.assert;
-
-const sort = std.sort.block;
-const asc = std.sort.asc;
-const desc = std.sort.desc;
-var gpa_impl = std.heap.GeneralPurposeAllocator(.{}){};
-pub const gpa = gpa_impl.allocator();
+const BoundedArray = std.BoundedArray;
+const eql = std.mem.eql;
 
 pub const StateError = error{
     GuardFailed,
@@ -45,9 +15,12 @@ pub const StateError = error{
 const MAX_TRANSITIONS = 20;
 const MAX_STATES = 20;
 
+var gpa_impl = std.heap.GeneralPurposeAllocator(.{}){};
+pub const gpa = gpa_impl.allocator();
+
 pub const State = struct {
     name: []const u8,
-    transitions: std.BoundedArray(*State, MAX_TRANSITIONS) = undefined,
+    transitions: BoundedArray(*State, MAX_TRANSITIONS) = undefined,
     // context: void,
     guard: ?*const fn (*State) StateError!bool = null,
     on_enter: ?*const fn (*State, *State) StateError!void = null,
@@ -90,13 +63,13 @@ pub const State = struct {
         var state = State{
             .name = name,
         };
-        state.transitions = std.BoundedArray(*State, MAX_TRANSITIONS).init(1) catch unreachable;
+        state.transitions = BoundedArray(*State, MAX_TRANSITIONS).init(1) catch unreachable;
         return state;
     }
 };
 
 pub const FiniteStateMachine = struct {
-    states: std.BoundedArray(State, MAX_STATES) = .{},
+    states: BoundedArray(State, MAX_STATES) = .{},
     current: *State = undefined,
     stack: List(*State) = undefined,
 
@@ -130,9 +103,9 @@ pub const FiniteStateMachine = struct {
         self.stack.append(self.current) catch unreachable;
     }
 
-    pub fn create(allocator: std.mem.Allocator) *FiniteStateMachine {
+    pub fn create(allocator: Allocator) *FiniteStateMachine {
         var fsm = allocator.create(FiniteStateMachine) catch unreachable;
-        fsm.states = std.BoundedArray(State, MAX_STATES).init(0) catch unreachable;
+        fsm.states = BoundedArray(State, MAX_STATES).init(0) catch unreachable;
         fsm.stack = List(*State).init(allocator);
         fsm.current = undefined;
         return fsm;
@@ -140,7 +113,7 @@ pub const FiniteStateMachine = struct {
 
     pub fn stateNamed(self: *FiniteStateMachine, name: []const u8) !*State {
         for (self.states.constSlice()) |s| {
-            if (std.mem.eql(u8, s.name, name)) return s;
+            if (eql(u8, s.name, name)) return s;
         }
         return error.StateNotFound;
     }
